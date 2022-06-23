@@ -4,8 +4,7 @@ CE = {
   sprites={},
   control=nil,
   map = {},
-  draw_map = {},
-  player_tile = nil,
+  camera = {min_x = 0, max_x = 0, min_y = 0, max_y = 0},
   action = {placing = false, removing = false}
 }
 
@@ -20,7 +19,8 @@ end
 
 function init()
   api_set_devmode(true)
-  register_carpet("check_rug1", "sprites/checkrug.png")
+  CE.map = ce_create_map()
+  ce_register_carpet("check_rug1", "sprites/checkrug.png")
   define_item()
   api_define_command("/check", "check_engines")
   api_define_command("/pos", "engine_pos")
@@ -29,10 +29,10 @@ function init()
 end
 
 function ready()
-  CE.player_tile = api_get_player_tile_position()
+  ce_set_camera()
   local engines = api_get_menu_objects(nil, "carpets_carpet_engine")
   if #engines == 0 then
-    api_create_obj("carpets_carpet_engine", CE.player_tile.x-208, CE.player_tile.y-160)
+    api_create_obj("carpets_carpet_engine", CE.camera.min_x, CE.camera.min_y)
   elseif #engines >= 2 then
     for index, value in ipairs(engines) do
       if index == 1 then
@@ -41,19 +41,16 @@ function ready()
       end
     end
   end
-  condense_carpets({x=CE.player_tile.x+16,y=CE.player_tile.y+16})
 end
 
 function save()
-  save_data = flatten_table(CE.map)
-  api_log("save", "i'm saving")
+  save_data = ce_flatten_map()
   api_set_data(save_data)
 end
 
 function data(ev, data)
   if ev == "LOAD" and data ~= nil then
-    --api_log("load", data)
-    CE.map = expand_table(data)
+    ce_expand_map(data)
   end
 
   if ev == "SAVE" then
@@ -66,30 +63,33 @@ function key(key_code)
 end
 
 function click(button, click_type)
+  local mouse_tile = api_get_mouse_tile_position()
+  local mx = _tile(mouse_tile.x)
+  local my = _tile(mouse_tile.y)
+  local equipped_item = api_get_equipped()
   if (button == "LEFT" and click_type == "PRESSED") then
-    if (b_is_equipped("log")) then
+    if equipped_item == "log" then
       CE.action.placing = true
-      local tile = api_get_mouse_tile_position()
-      if CE.map[tile.x] == nil then
-        CE.map[tile.x] = {}
-        morph_carpet(tile, true)
-        condense_carpets(CE.player_tile)
-      else
-        morph_carpet(tile, true)
-        condense_carpets(CE.player_tile)
+      if CE.map[mx][my] == nil then
+        CE.map[mx][my] = {
+          sprite = "check_rug1",
+          frame = 0,
+          x = mouse_tile.x,
+          y = mouse_tile.y
+        }
+        ce_masktiles(mx, my, true)
       end
     end
-    if (b_is_equipped("stone")) then
+
+    if equipped_item == "stone" then
       CE.action.removing = true
-      local tile = api_get_mouse_tile_position()
-      if CE.map[tile.x] ~= nil then
-        if CE.map[tile.x][tile.y] ~= nil then
-          morph_carpet(tile, false)
-          condense_carpets(CE.player_tile)
-        end
+      if CE.map[mx][my] ~= nil then
+        CE.map[mx][my] = nil
+        ce_masktiles(mx, my, false)
       end
     end
   end
+
   if (button == "LEFT" and click_type == "RELEASED") then
     CE.action.placing = false
     CE.action.removing = false
@@ -97,24 +97,28 @@ function click(button, click_type)
 end
 
 function tick()
+  ce_set_camera()
   if CE.action.placing == true then
-    local tile = api_get_mouse_tile_position()
-    if CE.map[tile.x] == nil then
-      CE.map[tile.x] = {}
-      morph_carpet(tile, true)
-      condense_carpets(CE.player_tile)
-    elseif CE.map[tile.x][tile.y] == nil then
-      morph_carpet(tile, true)
-      condense_carpets(CE.player_tile)
+    local mouse_tile = api_get_mouse_tile_position()
+    local mx = _tile(mouse_tile.x)
+    local my = _tile(mouse_tile.y)
+    if CE.map[mx][my] == nil then
+      CE.map[mx][my] = {
+        sprite = "check_rug1",
+        frame = 0,
+        x = mouse_tile.x,
+        y = mouse_tile.y
+      }
+      ce_masktiles(mx, my, true)
     end
   end
   if CE.action.removing == true then
-    local tile = api_get_mouse_tile_position()
-    if CE.map[tile.x] ~= nil then
-      if CE.map[tile.x][tile.y] ~= nil then
-        morph_carpet(tile, false)
-        condense_carpets(CE.player_tile)
-      end
+    local mouse_tile = api_get_mouse_tile_position()
+    local mx = _tile(mouse_tile.x)
+    local my = _tile(mouse_tile.y)
+    if CE.map[mx][my] ~= nil then
+      CE.map[mx][my] = nil
+      ce_masktiles(mx, my, false)
     end
   end
 end
@@ -148,29 +152,24 @@ function carpet_define(menu_id)
 end
 
 function carpet_tick(menu_id)
-  local player_pos = api_get_player_tile_position()
-
-  if player_pos.x ~= CE.player_tile.x or player_pos.y ~= CE.player_tile.y then
-    api_sp(CE.control, "x", player_pos.x - 208)
-    api_sp(CE.control, "y", player_pos.y - 160)
-    condense_carpets(player_pos)
-  end
+  local cam = api_get_cam()
+  api_sp(CE.control, "x", cam.x)
+  api_sp(CE.control, "y", cam.y)
 end
 
 function rug_draw(obj_id)
-  for _, next_tile in pairs(CE.draw_map) do
-    api_draw_sprite(CE.sprites["check_rug1"], next_tile.shape, next_tile.x, next_tile.y)
-  end
-end
-
-function b_is_equipped(item)
-  -- Get the currently equipped item
-  local equipped_item = api_get_equipped();
-
-  if (string.match(equipped_item, item)) then
-    return true
-  else
-    return false
+  local cam = api_get_cam()
+  for x=CE.camera.min_x, CE.camera.max_x do
+    for y=CE.camera.min_y, CE.camera.max_y do
+      if CE.map[x][y] ~= nil then
+        api_draw_sprite(
+          CE.sprites[CE.map[x][y].sprite],
+          CE.map[x][y].frame,
+          CE.map[x][y].x,
+          CE.map[x][y].y
+        )
+      end
+    end
   end
 end
 
@@ -184,159 +183,128 @@ function engine_pos(args)
   api_log("x,y", pos)
 end
 
-function condense_carpets(player_pos)
-  CE.draw_map = {}
-  CE.player_tile = player_pos
-  local min_x = player_pos.x - (16 * 22)
-  local max_x = player_pos.x + (16 * 22)
-  local min_y = player_pos.y - (16 * 13)
-  local max_y = player_pos.y + (16 * 13)
-  ----[[
-  for x_val, y_table in pairs(CE.map) do
-    if x_val > (min_x) and x_val < (max_x) then
-      for y_val, shape in pairs(y_table) do
-        if y_val > (min_y) and y_val < (max_y) then
-          table.insert(CE.draw_map, { x = x_val, y = y_val, shape = shape })
-        end
-      end
-    end
-  end
-  --]]--
-  --[[
-  for x_val=min_x, max_x, 16 do
-    if CE.map[x_val] ~= nil then
-      for y_val=min_y, max_y, 16 do
-        if CE.map[x_val][y_val] ~= nil then
-          carpet_draw[#carpet_draw+1] = {x = x_val, y = y_val, shape = CE.map[x_val][y_val]}
-        end
-      end
-    end
-  end
-  ]]--
-end
-
-function morph_carpet(tile_pos, placed)
-  if placed == true then
-    --placed
-    CE.map[tile_pos.x][tile_pos.y] = 0
-    nearby_carpets(tile_pos, true, true)
-  else
-    --removed
-    CE.map[tile_pos.x][tile_pos.y] = nil
-    nearby_carpets(tile_pos, true, false)
-  end
-end
-
-function nearby_carpets(tile_pos, first, placed)
-  local shape_num = 0
-  local nearby_tiles = {
-    up = { x = tile_pos.x, y = tile_pos.y - 16 },
-    right = { x = tile_pos.x + 16, y = tile_pos.y },
-    down = { x = tile_pos.x, y = tile_pos.y + 16 },
-    left = { x = tile_pos.x - 16, y = tile_pos.y }
-  }
-  if first == true then
-    --up (0001) +1
-    if CE.map[nearby_tiles.up.x] ~= nil then
-      if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
-        shape_num = shape_num + 1
-        nearby_carpets(nearby_tiles.up, false)
-      end
-    end
-    --right (0010) +2
-    if CE.map[nearby_tiles.right.x] ~= nil then
-      if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
-        shape_num = shape_num + 2
-        nearby_carpets(nearby_tiles.right, false)
-      end
-    end
-    --down (0100) +4
-    if CE.map[nearby_tiles.down.x] ~= nil then
-      if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
-        shape_num = shape_num + 4
-        nearby_carpets(nearby_tiles.down, false)
-      end
-    end
-    --left (1000) +8
-    if CE.map[nearby_tiles.left.x] ~= nil then
-      if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
-        shape_num = shape_num + 8
-        nearby_carpets(nearby_tiles.left, false)
-      end
-    end
-    if placed == true then
-      CE.map[tile_pos.x][tile_pos.y] = shape_num
-    end
-  else
-    --up (0001) +1
-    if CE.map[nearby_tiles.up.x] ~= nil then
-      if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
-        shape_num = shape_num + 1
-      end
-    end
-    --right (0010) +2
-    if CE.map[nearby_tiles.right.x] ~= nil then
-      if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
-        shape_num = shape_num + 2
-      end
-    end
-    --down (0100) +4
-    if CE.map[nearby_tiles.down.x] ~= nil then
-      if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
-        shape_num = shape_num + 4
-      end
-    end
-    --left (1000) +8
-    if CE.map[nearby_tiles.left.x] ~= nil then
-      if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
-        shape_num = shape_num + 8
-      end
-    end
-    CE.map[tile_pos.x][tile_pos.y] = shape_num
-  end
-end
-
-function flatten_table(input_table)
+function ce_flatten_map()
   output_table = {}
 
-  for x_val, y_table in pairs(input_table) do
-    for y_val, shape in pairs(y_table) do
-      table.insert(output_table, { x = x_val, y = y_val, shape = shape })
+  for x=CE.camera.min_x, CE.camera.max_x do
+    for y=CE.camera.min_y, CE.camera.max_y do
+      if CE.map[x][y] ~= nil then
+        table.insert(output_table, {
+          tile_x=x,
+          tile_y=y,
+          sprite=CE.map[x][y].sprite,
+          frame=CE.map[x][y].frame,
+          x=CE.map[x][y].x,
+          y=CE.map[x][y].y
+        })
+      end
     end
   end
   return output_table
 end
 
-function expand_table(input_table)
-  output_table = {}
+function ce_expand_map(input_table)
   for _, value in pairs(input_table) do
-    if output_table[value.x] == nil then
-      output_table[value.x] = {}
-      output_table[value.x][value.y] = value.shape
-    elseif output_table[value.x][value.y] == nil then
-      output_table[value.x][value.y] = value.shape
+    if value ~= nil and value ~= {} then
+      CE.map[value.tile_x][value.tile_y] = {
+        sprite=value.sprite,
+        frame=value.frame,
+        x=value.x,
+        y=value.y
+      }
     end
   end
-  return output_table
 end
 
-function register_carpet(carpet_id, carpet_sprite)
+function ce_register_carpet(carpet_id, carpet_sprite)
   CE.sprites[carpet_id] = api_define_sprite(carpet_id, carpet_sprite, 16)
 end
 
-function table_dump_recursion(starting_table, recursion_count)
-  msg = ""
-  for key, value in pairs(starting_table) do
-    if type(value) == 'table' then
-      msg = msg .. tostring(key) .. "->"
-      msg = msg .. table_dump_recursion(value, recursion_count + 1)
-    else
-      msg = msg .. "{" .. tostring(key) .. "=" .. tostring(value) .. "}"
+function _tile(tile_pos)
+  return math.floor(tile_pos/16)
+end
+
+function ce_set_camera()
+  local camera = api_get_cam()
+  local screen = api_get_game_size()
+  CE.camera.min_x = _tile(camera.x)
+  CE.camera.max_x = CE.camera.min_x + _tile(screen.width)
+  CE.camera.min_y = _tile(camera.y)
+  CE.camera.max_y = CE.camera.min_y + _tile(screen.height)
+end
+
+function ce_create_map()
+  local new_map = {}
+  for x=1,291 do
+    row = {}
+    for y=1, 291 do
+      table.insert(row,nil)
     end
-    if (recursion_count == 0) then
-      api_log("table_dump_recursion()", msg)
-      msg = ""
-    end
+    table.insert(new_map,row)
   end
-  return msg
+  return new_map
+end
+
+function ce_masktiles(tile_x, tile_y, placed)
+  if placed == true then
+    --placed
+    ce_nearby_carpets({x=tile_x, y=tile_y}, true, true)
+  else
+    --removed
+    CE.map[tile_x][tile_y] = nil
+    ce_nearby_carpets({x=tile_x, y=tile_y}, true, false)
+  end
+end
+
+function ce_nearby_carpets(tile_pos, first, placed)
+  local shape_num = 0
+  local nearby_tiles = {
+    up = { x = tile_pos.x, y = tile_pos.y - 1 },
+    right = { x = tile_pos.x + 1, y = tile_pos.y },
+    down = { x = tile_pos.x, y = tile_pos.y + 1 },
+    left = { x = tile_pos.x - 1, y = tile_pos.y }
+  }
+  if first == true then
+    --up (0001) +1
+    if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
+      shape_num = shape_num + 1
+      ce_nearby_carpets(nearby_tiles.up, false)
+    end
+    --right (0010) +2
+    if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
+      shape_num = shape_num + 2
+      ce_nearby_carpets(nearby_tiles.right, false)
+    end
+    --down (0100) +4
+    if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
+      shape_num = shape_num + 4
+      ce_nearby_carpets(nearby_tiles.down, false)
+    end
+    --left (1000) +8
+    if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
+      shape_num = shape_num + 8
+      ce_nearby_carpets(nearby_tiles.left, false)
+    end
+    if placed == true then
+      CE.map[tile_pos.x][tile_pos.y].frame = shape_num
+    end
+  else
+    --up (0001) +1
+    if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
+      shape_num = shape_num + 1
+    end
+    --right (0010) +2
+    if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
+      shape_num = shape_num + 2
+    end
+    --down (0100) +4
+    if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
+      shape_num = shape_num + 4
+    end
+    --left (1000) +8
+    if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
+      shape_num = shape_num + 8
+    end
+    CE.map[tile_pos.x][tile_pos.y].frame = shape_num
+  end
 end
