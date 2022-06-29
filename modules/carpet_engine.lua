@@ -1,125 +1,195 @@
+--[[
+  items = {[oid] = {sprite = sprite, infinite = boolean, size = number}},
+  map = {
+    [1-291] = {
+      [1-291] = {
+        sprite_id = oid,
+        frame = number,
+        x = number,
+        y = number
+      }
+    }
+  },
+]]--
+
 CE = {
+  mod_name = "",
   data = {},
-  sprites = {},
-  control = nil,
+  items = {},
+  preview_sprite = nil,
   map = {},
   camera = { min_x = 0, max_x = 0, min_y = 0, max_y = 0 },
-  action = { placing = false, removing = false }
+  action = { placing = nil, removing = false },
+  frames = {
+    [48] = {
+      [208] = 0,
+      [248] = 1,
+      [104] = 2,
+      [64] = 3,
+      [80] = 4,
+      [88] = 5,
+      [72] = 6,
+      [127] = 7,
+      [95] = 8,
+      [223] = 9,
+      [214] = 10,
+      [255] = 11,
+      [107] = 12,
+      [66] = 13,
+      [82] = 14,
+      [90] = 15,
+      [74] = 16,
+      [123] = 17,
+      [222] = 19,
+      [22] = 20,
+      [31] = 21,
+      [11]  = 22,
+      [2] = 23,
+      [18] = 24,
+      [26] = 25,
+      [10] = 26,
+      [251] = 27,
+      [250] = 28,
+      [254] = 29,
+      [16] = 30,
+      [24] = 31,
+      [8] = 32,
+      [0] = 33,
+      [120] = 34,
+      [75] = 35,
+      [86] = 36,
+      [216] = 37,
+      [91] = 38,
+      [94] = 39,
+      [30] = 40,
+      [27] = 41,
+      [219] = 42,
+      [126] = 43,
+      [210] = 44,
+      [106] = 47,
+      [122] = 48,
+      [218] = 49
+    },
+    [16] = {
+      [80] = 0,
+      [88] = 1,
+      [72] = 2,
+      [64] = 3,
+      [82] = 4,
+      [90] = 5,
+      [74] = 6,
+      [66] = 7,
+      [18] = 8,
+      [26] = 9,
+      [10]  = 10,
+      [2] = 11,
+      [16] = 12,
+      [24] = 13,
+      [8] = 14,
+      [0] = 15,
+    }
+  }
 }
 
 ---------------------------------------------------------------------------------------------
 --Hooks
 ---------------------------------------------------------------------------------------------
 
-function ce_init()
+function ce_init(mod_name)
+  CE.mod_name = mod_name
   ce_define_items()
 end
 
 function ce_ready()
   CE.map = ce_create_map()
   api_get_data()
-  local player_name = api_gp(api_get_player_instance(), "name")
-  if CE["data"][player_name] == nil then
-    CE["data"][player_name] = {}
+  local save_id = api_get_filename()
+  if CE["data"][save_id] == nil then
+    CE["data"][save_id] = {}
   end
   ce_set_camera()
-  local cam = api_get_cam()
-  local engines = api_get_menu_objects(nil, "carpets_carpet_engine")
-  if #engines == 0 then
-    api_log("ready1", "making")
-    api_create_obj("carpets_carpet_engine", cam.x, cam.y)
-  elseif #engines == 1 then
-    api_log("ready2", engines[1])
-    CE.control = engines[1].id
-    api_sp(CE.control, "x", cam.x)
-    api_sp(CE.control, "y", cam.y)
-  elseif #engines >= 2 then
-    for index, value in ipairs(engines) do
-      if index == 1 then
-        api_log("ready3", value)
-        CE.control = value.id
-        api_sp(CE.control, "x", cam.x)
-        api_sp(CE.control, "y", cam.y)
-      else
-        api_destroy_inst(value.id)
-      end
-    end
-  end
 end
 
 function ce_save()
-  local player_name = api_gp(api_get_player_instance(), "name")
+  local save_id = api_get_filename()
   local save_data = CE.data
-  save_data[player_name] = ce_flatten_map()
-  api_set_data(save_data)
+  save_data[save_id] = ce_flatten_map()
+  return save_data
 end
 
 function ce_load(data)
-  CE.data = data
-  local player_name = api_gp(api_get_player_instance(), "name")
-  if data[player_name] ~= nil then
-    ce_expand_map(data[player_name])
+  if data["ce_map"] ~= nil then
+    CE.data = data["ce_map"]
+    local save_id = api_get_filename()
+    if data["ce_map"][save_id] ~= nil then
+      ce_expand_map(data["ce_map"][save_id])
+    end
+  else
+    CE.data = {}
   end
 end
 
+
+--player place range = 9 tiles
 function ce_click(button, click_type)
-  local mouse_tile = api_get_mouse_tile_position()
-  local mx = _tile(mouse_tile.x)
-  local my = _tile(mouse_tile.y)
+  
   local equipped_item = api_get_equipped()
   if (button == "LEFT" and click_type == "PRESSED") then
-    if equipped_item == "log" then
-      CE.action.placing = true
-      if CE.map[mx][my] == nil then
-        CE.map[mx][my] = {
-          sprite = "check_rug1",
-          frame = 0,
-          x = mouse_tile.x,
-          y = mouse_tile.y
-        }
-        ce_masktiles(mx, my, true)
-      end
+    if CE.items[equipped_item] ~= nil then
+      CE.action.placing = equipped_item
+      ce_place_tile()
     end
 
-    if equipped_item == "stone" then
+    if equipped_item == CE.mod_name.."_scraper" then
       CE.action.removing = true
-      if CE.map[mx][my] ~= nil then
-        CE.map[mx][my] = nil
-        ce_masktiles(mx, my, false)
-      end
+      ce_remove_tile()
     end
   end
 
   if (button == "LEFT" and click_type == "RELEASED") then
-    CE.action.placing = false
+    CE.action.placing = nil
     CE.action.removing = false
   end
 end
 
 function ce_tick()
   ce_set_camera()
-  if CE.action.placing == true then
-    local mouse_tile = api_get_mouse_tile_position()
-    local mx = _tile(mouse_tile.x)
-    local my = _tile(mouse_tile.y)
-    if CE.map[mx][my] == nil then
-      CE.map[mx][my] = {
-        sprite = "check_rug1",
-        frame = 0,
-        x = mouse_tile.x,
-        y = mouse_tile.y
-      }
-      ce_masktiles(mx, my, true)
-    end
+  ce_tile_preview()
+  if CE.action.placing ~= nil then
+    ce_place_tile()
   end
   if CE.action.removing == true then
-    local mouse_tile = api_get_mouse_tile_position()
-    local mx = _tile(mouse_tile.x)
-    local my = _tile(mouse_tile.y)
-    if CE.map[mx][my] ~= nil then
-      CE.map[mx][my] = nil
-      ce_masktiles(mx, my, false)
+    ce_remove_tile()
+  end
+end
+
+function ce_tdraw()
+  local cam = api_get_camera_position()
+  for x = CE.camera.min_x, CE.camera.max_x do
+    for y = CE.camera.min_y, CE.camera.max_y do
+      if CE.map[x][y] ~= nil then
+        api_draw_sprite(
+          CE.items[CE.map[x][y].sprite_id].sprite,
+          CE.map[x][y].frame,
+          CE.map[x][y].x - cam.x,
+          CE.map[x][y].y - cam.y
+        )
+      end
     end
+  end
+  local mouse_tile = api_get_mouse_tile_position()
+  if CE.preview_sprite_id ~= nil then
+    api_draw_sprite_ext(
+          CE.items[CE.preview_sprite_id].sprite,
+          CE.frames[CE.items[CE.preview_sprite_id].size][0],
+          mouse_tile.x - cam.x,
+          mouse_tile.y - cam.y,
+          1,
+          1,
+          0,
+          nil,
+          0.4
+        )
   end
 end
 
@@ -127,62 +197,33 @@ end
 --Items and Register
 ---------------------------------------------------------------------------------------------
 
-function ce_register_carpet(carpet_id, carpet_sprite, carpet_item_sprite)
-  CE.sprites[carpet_id] = api_define_sprite(carpet_id, carpet_sprite, 16)
-  ce_define_flooring(carpet_id, carpet_item_sprite)
+function ce_register_flooring(item_def, carpet_sprite, carpet_item_sprite, infinite_use, sprite_size)
+  CE.items[CE.mod_name.."_"..item_def.id] = {sprite = nil, infinite = infinite_use, size = sprite_size}
+  CE.items[CE.mod_name.."_"..item_def.id].sprite = api_define_sprite(item_def.id, carpet_sprite, sprite_size)
+  ce_define_flooring(item_def, carpet_item_sprite, infinite_use)
 end
 
-function ce_define_flooring(carpet_id, carpet_item_sprite)
-  --api_define_item()
+function ce_define_flooring(item_def, carpet_item_sprite, infinite_use)
+  api_define_item({
+    id = item_def.id,
+    name = item_def.name,
+    category = "Flooring",
+    tooltip = item_def.tooltip,
+    shop_buy = item_def.shop_buy,
+    shop_sell = item_def.shop_sell,
+    singular = infinite_use
+  },carpet_item_sprite)
 end
+
 
 function ce_define_items()
-
-  -- define a custom item
-  api_define_menu_object({
-    id = "carpet_engine",
-    name = "Carpet Engine",
-    category = "Floors",
-    tooltip = "Just pretend you don't see me.",
-    menu = false,
-    layout = {},
-    cost = { buy = 1, sell = 1 },
-    tools = { "hammer1" },
-    buttons = {},
-    info = {},
-    machines = {},
-    placeable = false,
-    depth = -500 }, "sprites/carpets.png", "sprites/carpets.png", { define = "carpet_engine_define", tick = "carpet_engine_tick" },
-    "ce_draw_map")
-
-end
-
-function carpet_engine_define(menu_id)
-  local obj_id = api_get_menus_obj(menu_id)
-  local immortal = api_set_immortal(obj_id, true)
-
-  CE.control = obj_id
-end
-
-function carpet_engine_tick(menu_id)
-  local cam = api_get_cam()
-  api_sp(CE.control, "x", cam.x)
-  api_sp(CE.control, "y", cam.y)
-end
-
-function ce_draw_map(obj_id)
-  for x = CE.camera.min_x, CE.camera.max_x do
-    for y = CE.camera.min_y, CE.camera.max_y do
-      if CE.map[x][y] ~= nil then
-        api_draw_sprite(
-          CE.sprites[CE.map[x][y].sprite],
-          CE.map[x][y].frame,
-          CE.map[x][y].x,
-          CE.map[x][y].y
-        )
-      end
-    end
-  end
+  api_define_item({
+    id = "scraper",
+    name = "Scraper",
+    category = "Decoration",
+    tooltip = "Used to remove tiles.",
+    singular = true
+  }, "sprites/scraper_item.png")
 end
 
 ---------------------------------------------------------------------------------------------
@@ -190,15 +231,15 @@ end
 ---------------------------------------------------------------------------------------------
 
 function ce_flatten_map()
-  output_table = {}
+  local output_table = {}
 
-  for x = CE.camera.min_x, CE.camera.max_x do
-    for y = CE.camera.min_y, CE.camera.max_y do
+  for x = 1, 291 do
+    for y = 1, 291 do
       if CE.map[x][y] ~= nil then
         table.insert(output_table, {
           tile_x = x,
           tile_y = y,
-          sprite = CE.map[x][y].sprite,
+          sprite_id = CE.map[x][y].sprite_id,
           frame = CE.map[x][y].frame,
           x = CE.map[x][y].x,
           y = CE.map[x][y].y
@@ -213,7 +254,7 @@ function ce_expand_map(input_table)
   for _, value in pairs(input_table) do
     if value ~= nil and value ~= {} then
       CE.map[value.tile_x][value.tile_y] = {
-        sprite = value.sprite,
+        sprite_id = value.sprite_id,
         frame = value.frame,
         x = value.x,
         y = value.y
@@ -224,6 +265,39 @@ end
 
 function _tile(tile_pos)
   return math.floor(tile_pos / 16)
+end
+
+function ce_place_tile()
+  local mouse_tile = api_get_mouse_tile_position()
+  if ce_check_ground(mouse_tile.x, mouse_tile.y) then
+    local player_tile = api_get_player_tile_position()
+    if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 144 then
+      local mx = _tile(mouse_tile.x)
+      local my = _tile(mouse_tile.y)
+      if CE.map[mx][my] == nil then
+        CE.map[mx][my] = {
+          sprite_id = CE.action.placing,
+          frame = 0,
+          x = mouse_tile.x,
+          y = mouse_tile.y
+        }
+        ce_masktiles(mx, my, true)
+      end
+    end
+  end
+end
+
+function ce_remove_tile()
+  local mouse_tile = api_get_mouse_tile_position()
+  local player_tile = api_get_player_tile_position()
+  if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 144 then
+    local mx = _tile(mouse_tile.x)
+    local my = _tile(mouse_tile.y)
+    if CE.map[mx][my] ~= nil then
+      CE.map[mx][my] = nil
+      ce_masktiles(mx, my, false)
+    end
+  end
 end
 
 function ce_set_camera()
@@ -238,7 +312,7 @@ end
 function ce_create_map()
   local new_map = {}
   for x = 1, 291 do
-    row = {}
+    local row = {}
     for y = 1, 291 do
       table.insert(row, nil)
     end
@@ -260,53 +334,82 @@ end
 
 function ce_nearby_carpets(tile_pos, first, placed)
   local shape_num = 0
+  --1 = up, 2 = left, 3 = right, 4 = down
+  --5 = up+left, 6 = up+right, 7 = down+left, 8 = down+right
   local nearby_tiles = {
-    up = { x = tile_pos.x, y = tile_pos.y - 1 },
-    right = { x = tile_pos.x + 1, y = tile_pos.y },
-    down = { x = tile_pos.x, y = tile_pos.y + 1 },
-    left = { x = tile_pos.x - 1, y = tile_pos.y }
+    [1] = { x = tile_pos.x, y = tile_pos.y - 1, value = 2, ready = 2, helps = {5,6} },
+    [2] = { x = tile_pos.x - 1, y = tile_pos.y, value = 8, ready = 2, helps = {5,7} },
+    [3] = { x = tile_pos.x + 1, y = tile_pos.y, value = 16, ready = 2, helps = {6,8} },
+    [4] = { x = tile_pos.x, y = tile_pos.y + 1, value = 64, ready = 2, helps = {7,8} },
+    [5] = { x = tile_pos.x - 1, y = tile_pos.y - 1, value = 1, ready = 0 },
+    [6] = { x = tile_pos.x + 1, y = tile_pos.y - 1, value = 4, ready = 0 },
+    [7] = { x = tile_pos.x - 1, y = tile_pos.y + 1, value = 32, ready = 0 },
+    [8] = { x = tile_pos.x + 1, y = tile_pos.y + 1, value = 128, ready = 0 }
   }
+  local size = 1
+  if first == false or placed == true then
+    size = CE.items[CE.map[tile_pos.x][tile_pos.y].sprite_id].size
+  end
+  
+  
+
   if first == true then
-    --up (0001) +1
-    if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
-      shape_num = shape_num + 1
-      ce_nearby_carpets(nearby_tiles.up, false)
-    end
-    --right (0010) +2
-    if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
-      shape_num = shape_num + 2
-      ce_nearby_carpets(nearby_tiles.right, false)
-    end
-    --down (0100) +4
-    if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
-      shape_num = shape_num + 4
-      ce_nearby_carpets(nearby_tiles.down, false)
-    end
-    --left (1000) +8
-    if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
-      shape_num = shape_num + 8
-      ce_nearby_carpets(nearby_tiles.left, false)
+    for index, next_tile in ipairs(nearby_tiles) do
+      if CE.map[next_tile.x][next_tile.y] ~= nil then
+        if next_tile.ready == 2 then
+          if (size == 48 or index <= 4) and size ~= 1 then
+            shape_num = shape_num + next_tile.value
+          end
+          if next_tile.helps ~= nil then
+            nearby_tiles[next_tile.helps[1]].ready = nearby_tiles[next_tile.helps[1]].ready + 1
+            nearby_tiles[next_tile.helps[2]].ready = nearby_tiles[next_tile.helps[2]].ready + 1
+          end
+          ce_nearby_carpets(next_tile, false, true)
+        end
+      end
     end
     if placed == true then
-      CE.map[tile_pos.x][tile_pos.y].frame = shape_num
+      CE.map[tile_pos.x][tile_pos.y].frame = CE.frames[size][shape_num]
     end
   else
-    --up (0001) +1
-    if CE.map[nearby_tiles.up.x][nearby_tiles.up.y] ~= nil then
-      shape_num = shape_num + 1
+    for index, next_tile in ipairs(nearby_tiles) do
+      if CE.map[next_tile.x][next_tile.y] ~= nil then
+        if next_tile.ready == 2 then
+          if (size == 48 or index <= 4) and size ~= 1 then
+            shape_num = shape_num + next_tile.value
+          end
+          if next_tile.helps ~= nil then
+            nearby_tiles[next_tile.helps[1]].ready = nearby_tiles[next_tile.helps[1]].ready + 1
+            nearby_tiles[next_tile.helps[2]].ready = nearby_tiles[next_tile.helps[2]].ready + 1
+          end
+        end
+      end
     end
-    --right (0010) +2
-    if CE.map[nearby_tiles.right.x][nearby_tiles.right.y] ~= nil then
-      shape_num = shape_num + 2
-    end
-    --down (0100) +4
-    if CE.map[nearby_tiles.down.x][nearby_tiles.down.y] ~= nil then
-      shape_num = shape_num + 4
-    end
-    --left (1000) +8
-    if CE.map[nearby_tiles.left.x][nearby_tiles.left.y] ~= nil then
-      shape_num = shape_num + 8
-    end
-    CE.map[tile_pos.x][tile_pos.y].frame = shape_num
+    CE.map[tile_pos.x][tile_pos.y].frame = CE.frames[size][shape_num]
+  end
+end
+
+function ce_distance ( x1, y1, x2, y2 )
+  local dx = x1 - x2
+  local dy = y1 - y2
+  return math.sqrt ( dx * dx + dy * dy )
+end
+
+function ce_check_ground(tx, ty)
+  local ground = api_get_ground(tx,ty)
+  local floor = api_get_floor(tx,ty)
+  if string.sub(ground,1,5) == "grass" or floor ~= "tile0" then
+    return true
+  else
+    return false
+  end
+end
+
+function ce_tile_preview()
+  local equipped_item = api_get_equipped()
+  if CE.items[equipped_item] ~= nil then
+    CE.preview_sprite_id = equipped_item
+  else
+    CE.preview_sprite_id = nil
   end
 end
