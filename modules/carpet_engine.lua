@@ -10,10 +10,12 @@
       }
     }
   },
-]]--
+]] --
 
 CE = {
+  delete_data = false,
   mod_name = "",
+  player_inst_id = nil,
   data = {},
   items = {},
   preview_sprite = nil,
@@ -25,44 +27,44 @@ CE = {
       [208] = 0,
       [248] = 1,
       [104] = 2,
-      [64] = 3,
-      [80] = 4,
-      [88] = 5,
-      [72] = 6,
+      [64]  = 3,
+      [80]  = 4,
+      [88]  = 5,
+      [72]  = 6,
       [127] = 7,
-      [95] = 8,
+      [95]  = 8,
       [223] = 9,
       [214] = 10,
       [255] = 11,
       [107] = 12,
-      [66] = 13,
-      [82] = 14,
-      [90] = 15,
-      [74] = 16,
+      [66]  = 13,
+      [82]  = 14,
+      [90]  = 15,
+      [74]  = 16,
       [123] = 17,
       [222] = 19,
-      [22] = 20,
-      [31] = 21,
+      [22]  = 20,
+      [31]  = 21,
       [11]  = 22,
-      [2] = 23,
-      [18] = 24,
-      [26] = 25,
-      [10] = 26,
+      [2]   = 23,
+      [18]  = 24,
+      [26]  = 25,
+      [10]  = 26,
       [251] = 27,
       [250] = 28,
       [254] = 29,
-      [16] = 30,
-      [24] = 31,
-      [8] = 32,
-      [0] = 33,
+      [16]  = 30,
+      [24]  = 31,
+      [8]   = 32,
+      [0]   = 33,
       [120] = 34,
-      [75] = 35,
-      [86] = 36,
+      [75]  = 35,
+      [86]  = 36,
       [216] = 37,
-      [91] = 38,
-      [94] = 39,
-      [30] = 40,
-      [27] = 41,
+      [91]  = 38,
+      [94]  = 39,
+      [30]  = 40,
+      [27]  = 41,
       [219] = 42,
       [126] = 43,
       [210] = 44,
@@ -81,12 +83,12 @@ CE = {
       [66] = 7,
       [18] = 8,
       [26] = 9,
-      [10]  = 10,
-      [2] = 11,
+      [10] = 10,
+      [2]  = 11,
       [16] = 12,
       [24] = 13,
-      [8] = 14,
-      [0] = 15,
+      [8]  = 14,
+      [0]  = 15,
     }
   }
 }
@@ -107,6 +109,7 @@ function ce_ready()
   if CE["data"][save_id] == nil then
     CE["data"][save_id] = {}
   end
+  CE.player_inst_id = api_get_player_instance()
   ce_set_camera()
 end
 
@@ -121,7 +124,7 @@ function ce_load(data)
   if data["ce_map"] ~= nil then
     CE.data = data["ce_map"]
     local save_id = api_get_filename()
-    if data["ce_map"][save_id] ~= nil then
+    if data["ce_map"][save_id] ~= nil and CE.delete_data == false then
       ce_expand_map(data["ce_map"][save_id])
     end
   else
@@ -129,10 +132,9 @@ function ce_load(data)
   end
 end
 
-
 --player place range = 9 tiles
 function ce_click(button, click_type)
-  
+
   local equipped_item = api_get_equipped()
   if (button == "LEFT" and click_type == "PRESSED") then
     if CE.items[equipped_item] ~= nil then
@@ -140,7 +142,7 @@ function ce_click(button, click_type)
       ce_place_tile()
     end
 
-    if equipped_item == CE.mod_name.."_scraper" then
+    if equipped_item == CE.mod_name .. "_scraper" then
       CE.action.removing = true
       ce_remove_tile()
     end
@@ -156,10 +158,18 @@ function ce_tick()
   ce_set_camera()
   ce_tile_preview()
   if CE.action.placing ~= nil then
-    ce_place_tile()
+    if CE.action.placing ~= api_get_equipped() then
+      CE.action.placing = nil
+    else
+      ce_place_tile()
+    end
   end
   if CE.action.removing == true then
-    ce_remove_tile()
+    if api_get_equipped() ~= CE.mod_name .. "_scraper" then
+      CE.action.removing = false
+    else
+      ce_remove_tile()
+    end
   end
 end
 
@@ -180,30 +190,46 @@ function ce_tdraw()
   local mouse_tile = api_get_mouse_tile_position()
   if CE.preview_sprite_id ~= nil then
     api_draw_sprite_ext(
-          CE.items[CE.preview_sprite_id].sprite,
-          CE.frames[CE.items[CE.preview_sprite_id].size][0],
-          mouse_tile.x - cam.x,
-          mouse_tile.y - cam.y,
-          1,
-          1,
-          0,
-          nil,
-          0.4
-        )
+      CE.items[CE.preview_sprite_id].sprite,
+      CE.frames[CE.items[CE.preview_sprite_id].size][0],
+      mouse_tile.x - cam.x,
+      mouse_tile.y - cam.y,
+      1,
+      1,
+      0,
+      nil,
+      0.4
+    )
   end
+end
+
+function ce_worldgen()
+  CE.delete_data = true
 end
 
 ---------------------------------------------------------------------------------------------
 --Items and Register
 ---------------------------------------------------------------------------------------------
 
-function ce_register_flooring(item_def, carpet_sprite, carpet_item_sprite, infinite_use, sprite_size)
-  CE.items[CE.mod_name.."_"..item_def.id] = {sprite = nil, infinite = infinite_use, size = sprite_size}
-  CE.items[CE.mod_name.."_"..item_def.id].sprite = api_define_sprite(item_def.id, carpet_sprite, sprite_size)
-  ce_define_flooring(item_def, carpet_item_sprite, infinite_use)
+function ce_register_flooring(item_def)
+  local new_item_def = {
+    id = item_def.id or "error_no_id",
+    name = item_def.name or "error_no_name",
+    tooltip = item_def.tooltip or "error_no_tooltip",
+    shop_buy = item_def.shop_buy or 0,
+    shop_sell = item_def.shop_sell or 0,
+    carpet_sprite = item_def.carpet_sprite or "error_no_sprite",
+    carpet_item_sprite = item_def.carpet_item_sprite or "error_no_item_sprite",
+    infinite_use = item_def.infinite_use or false,
+    sprite_size = item_def.sprite_size or 16 }
+  CE.items[CE.mod_name .. "_" .. new_item_def.id] = { sprite = nil, infinite = new_item_def.infinite_use,
+    size = new_item_def.sprite_size }
+  CE.items[CE.mod_name .. "_" .. new_item_def.id].sprite = api_define_sprite(new_item_def.id, new_item_def.carpet_sprite
+    , new_item_def.sprite_size)
+  ce_define_flooring(new_item_def)
 end
 
-function ce_define_flooring(item_def, carpet_item_sprite, infinite_use)
+function ce_define_flooring(item_def)
   api_define_item({
     id = item_def.id,
     name = item_def.name,
@@ -211,10 +237,9 @@ function ce_define_flooring(item_def, carpet_item_sprite, infinite_use)
     tooltip = item_def.tooltip,
     shop_buy = item_def.shop_buy,
     shop_sell = item_def.shop_sell,
-    singular = infinite_use
-  },carpet_item_sprite)
+    singular = item_def.infinite_use
+  }, item_def.carpet_item_sprite)
 end
-
 
 function ce_define_items()
   api_define_item({
@@ -271,7 +296,7 @@ function ce_place_tile()
   local mouse_tile = api_get_mouse_tile_position()
   if ce_check_ground(mouse_tile.x, mouse_tile.y) then
     local player_tile = api_get_player_tile_position()
-    if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 144 then
+    if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 160 then
       local mx = _tile(mouse_tile.x)
       local my = _tile(mouse_tile.y)
       if CE.map[mx][my] == nil then
@@ -282,6 +307,9 @@ function ce_place_tile()
           y = mouse_tile.y
         }
         ce_masktiles(mx, my, true)
+        if CE.items[CE.action.placing].infinite == false then
+          ce_reduce_equipped_item()
+        end
       end
     end
   end
@@ -290,14 +318,30 @@ end
 function ce_remove_tile()
   local mouse_tile = api_get_mouse_tile_position()
   local player_tile = api_get_player_tile_position()
-  if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 144 then
+  if ce_distance(player_tile.x, player_tile.y, mouse_tile.x, mouse_tile.y) <= 160 then
     local mx = _tile(mouse_tile.x)
     local my = _tile(mouse_tile.y)
     if CE.map[mx][my] ~= nil then
+      if CE.items[CE.map[mx][my].sprite_id].infinite == false then
+        ce_give_tile_item(CE.map[mx][my].sprite_id,mouse_tile.x, mouse_tile.y)
+      end
       CE.map[mx][my] = nil
       ce_masktiles(mx, my, false)
     end
   end
+end
+
+function ce_reduce_equipped_item()
+  local mouse_inst = api_get_mouse_inst()
+  if mouse_inst.item == CE.action.placing then
+    api_slot_decr(mouse_inst.id)
+  else
+    api_slot_decr(api_get_slot(CE.player_inst_id,api_gp(CE.player_inst_id, "hotbar")+1).id)
+  end
+end
+
+function ce_give_tile_item(item_id, mouse_x, mouse_y)
+  api_create_item(item_id, 1, mouse_x, mouse_y)
 end
 
 function ce_set_camera()
@@ -337,10 +381,10 @@ function ce_nearby_carpets(tile_pos, first, placed)
   --1 = up, 2 = left, 3 = right, 4 = down
   --5 = up+left, 6 = up+right, 7 = down+left, 8 = down+right
   local nearby_tiles = {
-    [1] = { x = tile_pos.x, y = tile_pos.y - 1, value = 2, ready = 2, helps = {5,6} },
-    [2] = { x = tile_pos.x - 1, y = tile_pos.y, value = 8, ready = 2, helps = {5,7} },
-    [3] = { x = tile_pos.x + 1, y = tile_pos.y, value = 16, ready = 2, helps = {6,8} },
-    [4] = { x = tile_pos.x, y = tile_pos.y + 1, value = 64, ready = 2, helps = {7,8} },
+    [1] = { x = tile_pos.x, y = tile_pos.y - 1, value = 2, ready = 2, helps = { 5, 6 } },
+    [2] = { x = tile_pos.x - 1, y = tile_pos.y, value = 8, ready = 2, helps = { 5, 7 } },
+    [3] = { x = tile_pos.x + 1, y = tile_pos.y, value = 16, ready = 2, helps = { 6, 8 } },
+    [4] = { x = tile_pos.x, y = tile_pos.y + 1, value = 64, ready = 2, helps = { 7, 8 } },
     [5] = { x = tile_pos.x - 1, y = tile_pos.y - 1, value = 1, ready = 0 },
     [6] = { x = tile_pos.x + 1, y = tile_pos.y - 1, value = 4, ready = 0 },
     [7] = { x = tile_pos.x - 1, y = tile_pos.y + 1, value = 32, ready = 0 },
@@ -350,22 +394,20 @@ function ce_nearby_carpets(tile_pos, first, placed)
   if first == false or placed == true then
     size = CE.items[CE.map[tile_pos.x][tile_pos.y].sprite_id].size
   end
-  
-  
+
+
 
   if first == true then
     for index, next_tile in ipairs(nearby_tiles) do
-      if CE.map[next_tile.x][next_tile.y] ~= nil then
-        if next_tile.ready == 2 then
-          if (size == 48 or index <= 4) and size ~= 1 then
-            shape_num = shape_num + next_tile.value
-          end
-          if next_tile.helps ~= nil then
-            nearby_tiles[next_tile.helps[1]].ready = nearby_tiles[next_tile.helps[1]].ready + 1
-            nearby_tiles[next_tile.helps[2]].ready = nearby_tiles[next_tile.helps[2]].ready + 1
-          end
-          ce_nearby_carpets(next_tile, false, true)
+      if CE.map[next_tile.x][next_tile.y] ~= nil and next_tile.ready == 2 then
+        if (size == 48 or index <= 4) and size ~= 1 then
+          shape_num = shape_num + next_tile.value
         end
+        if next_tile.helps ~= nil then
+          nearby_tiles[ next_tile.helps[1] ].ready = nearby_tiles[ next_tile.helps[1] ].ready + 1
+          nearby_tiles[ next_tile.helps[2] ].ready = nearby_tiles[ next_tile.helps[2] ].ready + 1
+        end
+        ce_nearby_carpets(next_tile, false, true)
       end
     end
     if placed == true then
@@ -373,15 +415,13 @@ function ce_nearby_carpets(tile_pos, first, placed)
     end
   else
     for index, next_tile in ipairs(nearby_tiles) do
-      if CE.map[next_tile.x][next_tile.y] ~= nil then
-        if next_tile.ready == 2 then
-          if (size == 48 or index <= 4) and size ~= 1 then
-            shape_num = shape_num + next_tile.value
-          end
-          if next_tile.helps ~= nil then
-            nearby_tiles[next_tile.helps[1]].ready = nearby_tiles[next_tile.helps[1]].ready + 1
-            nearby_tiles[next_tile.helps[2]].ready = nearby_tiles[next_tile.helps[2]].ready + 1
-          end
+      if CE.map[next_tile.x][next_tile.y] ~= nil and next_tile.ready == 2 then
+        if (size == 48 or index <= 4) and size ~= 1 then
+          shape_num = shape_num + next_tile.value
+        end
+        if next_tile.helps ~= nil then
+          nearby_tiles[ next_tile.helps[1] ].ready = nearby_tiles[ next_tile.helps[1] ].ready + 1
+          nearby_tiles[ next_tile.helps[2] ].ready = nearby_tiles[ next_tile.helps[2] ].ready + 1
         end
       end
     end
@@ -389,16 +429,16 @@ function ce_nearby_carpets(tile_pos, first, placed)
   end
 end
 
-function ce_distance ( x1, y1, x2, y2 )
+function ce_distance(x1, y1, x2, y2)
   local dx = x1 - x2
   local dy = y1 - y2
-  return math.sqrt ( dx * dx + dy * dy )
+  return math.sqrt(dx * dx + dy * dy)
 end
 
 function ce_check_ground(tx, ty)
-  local ground = api_get_ground(tx,ty)
-  local floor = api_get_floor(tx,ty)
-  if string.sub(ground,1,5) == "grass" or floor ~= "tile0" then
+  local ground = api_get_ground(tx, ty)
+  local floor = api_get_floor(tx, ty)
+  if string.sub(ground, 1, 5) == "grass" or floor ~= "tile0" then
     return true
   else
     return false
