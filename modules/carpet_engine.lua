@@ -222,10 +222,9 @@ function ce_register_flooring(item_def)
     carpet_item_sprite = item_def.carpet_item_sprite or "error_no_item_sprite",
     infinite_use = item_def.infinite_use or false,
     sprite_size = item_def.sprite_size or 16 }
-  CE.items[CE.mod_name .. "_" .. new_item_def.id] = { sprite = nil, infinite = new_item_def.infinite_use,
-    size = new_item_def.sprite_size }
-  CE.items[CE.mod_name .. "_" .. new_item_def.id].sprite = api_define_sprite(new_item_def.id, new_item_def.carpet_sprite
-    , new_item_def.sprite_size)
+  CE.items[CE.mod_name .. "_" .. new_item_def.id] = { sprite = nil, infinite = new_item_def.infinite_use, size = new_item_def.sprite_size }
+  CE.items[CE.mod_name .. "_" .. new_item_def.id].sprite = api_define_sprite(new_item_def.id, new_item_def.carpet_sprite, new_item_def.sprite_size)
+  
   ce_define_flooring(new_item_def)
 end
 
