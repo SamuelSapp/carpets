@@ -8,7 +8,7 @@ function register()
 
   return {
     name = MOD_NAME,
-    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen"},
+    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen", "create"},
     modules = { "carpet_engine" }
   }
 end
@@ -53,6 +53,10 @@ end
 
 function worldgen(before_objects)
   ce_worldgen()
+end
+
+function create(id, x, y, oid, inst_type)
+  api_log("create", oid.." created, of ".. inst_type)
 end
 
 function carpet_test_command(args)
