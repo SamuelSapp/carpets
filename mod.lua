@@ -3,6 +3,7 @@ MOD_NAME = "tiling_engine"
 check_rug_def = {id="check_rug1", name="Checkered Rug", tooltip="This is a checkered rug.", shop_buy = 5, shop_sell = 2, carpet_sprite = "sprites/checkrug1.png", carpet_item_sprite = "sprites/checkrugitem.png", infinite_use = true, sprite_size = 16}
 pink_rug_def = {id="check_pink", name="Pink Checkered Rug", tooltip="This is a pink checkered rug.", shop_buy = 5, shop_sell = 2, carpet_sprite ="sprites/checkrug_pink.png",carpet_item_sprite = "sprites/checkrug_pink_item.png",infinite_use = false,sprite_size = 16}
 fake_swamp_def = {id="fake_swamp", name = "Fake Swamp", tooltip="This floor looks all swampy!", shop_buy = 50, shop_sell = 1, carpet_sprite = "sprites/fake_swamp.png", carpet_item_sprite = "sprites/fake_swamp_item.png", infinite_use =true,sprite_size = 48}
+blue_rug_def = {id="check_blue", name="Blue Checkered Rug", tooltip="This is a blue checkered rug.", shop_buy = 5, shop_sell = 2, carpet_sprite ="sprites/checkrug_blue.png",carpet_item_sprite = "sprites/checkrug_blue_item.png",infinite_use = true,sprite_size = 1}
 
 function register()
 
@@ -19,6 +20,7 @@ function init()
   ce_register_flooring(check_rug_def)
   ce_register_flooring(pink_rug_def)
   ce_register_flooring(fake_swamp_def)
+  ce_register_flooring(blue_rug_def)
   api_define_command("/carpet_test", "carpet_test_command")
   return "Success"
 end
@@ -53,10 +55,6 @@ end
 
 function worldgen(before_objects)
   ce_worldgen()
-end
-
-function create(id, x, y, oid, inst_type)
-  api_log("create", oid.." created, of ".. inst_type)
 end
 
 function carpet_test_command(args)

@@ -16,12 +16,13 @@ CE = {
       [74] = 16, [123] = 17, [222] = 19, [22] = 20, [31] = 21, [11] = 22, [2] = 23, 
       [18] = 24, [26] = 25, [10] = 26, [251] = 27, [250] = 28, [254] = 29, [16] = 30, [24] = 31, 
       [8] = 32, [0] = 33, [120] = 34, [75] = 35, [86] = 36, [216] = 37, [91] = 38, [94] = 39, 
-      [30] = 40, [27] = 41, [219] = 42, [126] = 43, [210] = 44, [106] = 47, [122] = 48, [218] = 49
+      [219] = 42, [126] = 43, [210] = 44, [30] = 45, [27] = 46, [106] = 47, [122] = 48, [218] = 49
     },
     [16] = { 
       [80] = 0, [88] = 1, [72] = 2, [64] = 3, [82] = 4, [90] = 5, [74] = 6, [66] = 7, 
       [18] = 8, [26] = 9, [10] = 10, [2] = 11, [16] = 12, [24] = 13, [8] = 14, [0] = 15,
-    }
+    },
+    [1] = {[0] = 0}
   }
 }
 
@@ -69,12 +70,15 @@ end
 
 -- handle tile place/remove plus start stop any mouse drag
 function ce_click(button, click_type)
+  -- get equipped item
   local equipped_item = api_get_equipped()
   if (button == "LEFT" and click_type == "PRESSED") then
+    -- check if equipped item is registered as a carpet
     if CE.items[equipped_item] ~= nil then
       CE.action.placing = equipped_item
       ce_place_tile()
     end
+    -- check if equipped item is registered as a scraper
     if equipped_item == CE.mod_name .. "_scraper" then
       CE.action.removing = true
       ce_remove_tile()
