@@ -9,7 +9,7 @@ function register()
 
   return {
     name = MOD_NAME,
-    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen", "create"},
+    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen"},
     modules = { "carpet_engine" }
   }
 end
