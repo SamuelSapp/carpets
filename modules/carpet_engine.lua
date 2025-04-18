@@ -62,6 +62,10 @@ function ce_load(data)
     local save_id = api_get_filename()
     if data["ce_map"][save_id] ~= nil and CE.delete_data == false then
       ce_expand_map(data["ce_map"][save_id])
+    elseif CE.delete_data == true then
+      local save_data = {}
+      save_data["ce_map"] = ce_save()
+      api_set_data(save_data)
     end
   else
     CE.data = {}

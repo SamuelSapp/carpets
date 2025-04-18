@@ -9,7 +9,7 @@ function register()
 
   return {
     name = MOD_NAME,
-    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen", "create"},
+    hooks = { "ready", "save", "data", "click", "tick", "tdraw", "worldgen"},
     modules = { "carpet_engine" }
   }
 end
@@ -43,6 +43,10 @@ end
 
 function click(button, click_type)
   ce_click(button, click_type)
+  local mouse_tile = api_get_mouse_position()
+  local ground = api_get_ground(mouse_tile.x, mouse_tile.y)
+  local objs = api_get_inst_in_rectangle("lw", mouse_tile.x, mouse_tile.y, mouse_tile.x+1, mouse_tile.y+1)
+  api_log("clicked", objs)
 end
 
 function tick()
